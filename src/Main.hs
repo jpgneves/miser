@@ -12,6 +12,9 @@ data Definition =
   TypeDef DefinitionType Identifier
   | StructDef Identifier [Field]
   | UnionDef Identifier [Field]
+  | EnumDef Identifier [EnumElem]
+  | ExceptionDef Identifier [Field]
+  | ServiceDef Identifier (Maybe Identifier) [Function]
   deriving (Show)
 
 data DefinitionType =
@@ -20,6 +23,8 @@ data DefinitionType =
   | ListType FieldType
   | SetType FieldType
   deriving (Show)
+
+data EnumElem = EnumElem Identifier (Maybe Integer) deriving (Show)
 
 data Field = Field (Maybe FieldId) (Maybe FieldQualifier) FieldType Identifier deriving (Show)
 
@@ -33,6 +38,17 @@ data FieldQualifier =
 data FieldType =
   IdentifierFieldType Identifier
   | DefinitionFieldType DefinitionType
+  deriving (Show)
+
+data Function = Function Bool FunctionType Identifier [Field] (Maybe Throws)
+  deriving (Show)
+
+data FunctionType =
+  FunctionType FieldType
+  | VoidFunctionType
+  deriving (Show)
+
+data Throws = Throws [Field]
   deriving (Show)
 
 data Header =
@@ -52,6 +68,9 @@ spaceConsumer = L.space (void spaceChar) lineComment blockComment
   where lineComment = L.skipLineComment "//" <|> L.skipLineComment "#"
         blockComment = L.skipBlockComment "/*" "*/"
 
+listSeparatorConsumer :: Parser ()
+listSeparatorConsumer = void (symbol ",") <|> void (symbol ";")
+
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme spaceConsumer
 
@@ -64,16 +83,18 @@ literal = do
   return $ Literal lit
 
 integer :: Parser Integer
-integer = L.integer
+integer = lexeme $ L.integer
 
 reservedWord :: String -> Parser ()
 reservedWord w = string w *> notFollowedBy alphaNumChar *> spaceConsumer
 
 reservedWords :: [String]
-reservedWords = [ "const"
+reservedWords = [ "oneway"
+                , "const"
                 , "typedef"
                 , "enum"
                 , "senum"
+                , "extends"
                 ] ++ includeTypes ++ namespaceScopes ++ baseTypes ++ containerTypes ++ complexTypes
 
 includeTypes :: [String]
@@ -211,7 +232,7 @@ typeDef :: Parser Definition
 typeDef = do
   reservedWord "typedef"
   defType <- definitionType
-  ident <- identifier
+  ident   <- identifier
   return $ TypeDef defType ident
 
 block :: Parser a -> Parser a
@@ -257,8 +278,76 @@ unionDef = do
   fs    <- block fields
   return $ UnionDef ident fs
 
+enumElem :: Parser EnumElem
+enumElem = do
+  ident <- identifier
+  index <- optional $ (void $ symbol "=") >> integer
+  void $ optional $ listSeparatorConsumer
+  return $ EnumElem ident index
+
+enumElems :: Parser [EnumElem]
+enumElems = many $ spaceConsumer *> enumElem
+
+enumDef :: Parser Definition
+enumDef = do
+  reservedWord "enum"
+  ident <- identifier
+  elems <- block enumElems
+  return $ EnumDef ident elems
+
+exceptionDef :: Parser Definition
+exceptionDef = do
+  reservedWord "exception"
+  ident <- identifier
+  fs    <- block fields
+  return $ ExceptionDef ident fs
+
+voidFunctionType :: Parser FunctionType
+voidFunctionType = (symbol "void") >> return VoidFunctionType
+
+fieldFunctionType :: Parser FunctionType
+fieldFunctionType = do
+  ftype <- fieldType
+  return $ FunctionType ftype
+
+functionType :: Parser FunctionType
+functionType = voidFunctionType <|> fieldFunctionType
+
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")
+
+throws :: Parser Throws
+throws = do
+  reservedWord "throws"
+  fs <- parens fields
+  return $ Throws fs
+
+function :: Parser Function
+function = do
+  oneway <- option False $ (symbol "oneway") >> return True
+  ftype <- functionType
+  ident <- identifier
+  fs    <- parens fields
+  throws <- optional $ throws
+  void $ optional $ listSeparatorConsumer
+  return $ Function oneway ftype ident fs throws
+
+functions :: Parser [Function]
+functions = many $ spaceConsumer *> function
+
+extends :: Parser Identifier
+extends = reservedWord "extends" >> identifier
+
+serviceDef :: Parser Definition
+serviceDef = do
+  reservedWord "service"
+  ident <- identifier
+  ext <- optional extends
+  funs <- block functions
+  return $ ServiceDef ident ext funs
+
 definition :: Parser Definition
-definition = typeDef <|> structDef <|> unionDef
+definition = try typeDef <|> try structDef <|> unionDef <|> try enumDef <|> exceptionDef <|> serviceDef
 
 definitions :: Parser [Definition]
 definitions = many $ spaceConsumer *> definition

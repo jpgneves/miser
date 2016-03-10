@@ -25,3 +25,21 @@ union Bar {
   1: bool a // And even a union!
   2: i32 b
 }
+
+exception Deaded {
+  1: string msg
+}
+
+enum Baz {
+     ONE
+     TWO = 2
+}
+
+service TestService {
+  string sayHello(1: string name)
+  oneway void kill() throws (1: Deaded heDed)
+}
+
+service InheritingService extends TestService {
+  map<long, text> doSomething()
+}
