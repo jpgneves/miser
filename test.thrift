@@ -4,10 +4,14 @@ include "foo"
 include "Foo"
 cpp_include "Bar"
 
+# Some typedefs
 typedef bool mybool
 typedef i64 long
 typedef list<string> text
 
+/*
+  My amazing Struct
+*/
 struct Foo {
   1: bool a
   2: mybool b
@@ -18,6 +22,6 @@ struct Foo {
 }
 
 union Bar {
-  1: bool a
+  1: bool a // And even a union!
   2: i32 b
 }

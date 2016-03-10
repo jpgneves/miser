@@ -49,7 +49,7 @@ data NamespaceScope = NamespaceScope String deriving (Show)
 
 spaceConsumer :: Parser ()
 spaceConsumer = L.space (void spaceChar) lineComment blockComment
-  where lineComment = L.skipLineComment "//"
+  where lineComment = L.skipLineComment "//" <|> L.skipLineComment "#"
         blockComment = L.skipBlockComment "/*" "*/"
 
 lexeme :: Parser a -> Parser a
