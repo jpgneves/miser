@@ -14,6 +14,8 @@ cabal-version:       >=1.10
 
 executable miser
   hs-source-dirs:      src
+  other-modules:       Text.Miser.Thrift.Lexer
+                     , Text.Miser.Thrift.Parser
   main-is:             Main.hs
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
