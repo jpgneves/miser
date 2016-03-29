@@ -9,6 +9,12 @@ typedef bool mybool
 typedef i64 long
 typedef list<string> text
 
+// And some consts
+const i64 MyInt = -32
+const double MyDouble = 1.0e-2
+const list<i8> MyList = [0, 1, 2, 3, 4, 5]
+const map<i8, string> MyMap = { 0:1, 1:[2,3] }
+
 /*
   My amazing Struct
 */
@@ -19,10 +25,11 @@ struct Foo {
   4: long d
   5: required string e
   6: map<long, text> f
+  7: list<i8> g = [0, 1, 2, 3]
 }
 
 union Bar {
-  1: bool a // And even a union!
+  1: bool a // And even a union! (And inline comments!)
   2: i32 b
 }
 

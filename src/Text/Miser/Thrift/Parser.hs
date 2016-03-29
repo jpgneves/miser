@@ -9,6 +9,7 @@ data Document = Document [Header] [Definition] deriving (Show)
 
 data Definition =
   TypeDef DefinitionType Identifier
+  | ConstDef FieldType Identifier ConstValue
   | StructDef Identifier [Field]
   | UnionDef Identifier [Field]
   | EnumDef Identifier [EnumElem]
@@ -23,9 +24,16 @@ data DefinitionType =
   | SetType FieldType
   deriving (Show)
 
+data ConstValue =
+  IntConstant Integer
+  | DoubleConstant Double
+  | ListConstant [ConstValue]
+  | MapConstant [(ConstValue, ConstValue)]
+  deriving (Show)
+
 data EnumElem = EnumElem Identifier (Maybe Integer) deriving (Show)
 
-data Field = Field (Maybe FieldId) (Maybe FieldQualifier) FieldType Identifier deriving (Show)
+data Field = Field (Maybe FieldId) (Maybe FieldQualifier) FieldType Identifier (Maybe ConstValue) deriving (Show)
 
 data FieldId = FieldId Integer deriving (Show)
 
@@ -108,9 +116,6 @@ keyValueType = do
   valueType <- fieldType
   return $ (keyType, valueType)
 
-subType :: Parser a -> Parser a
-subType = between (symbol "<") (symbol ">")
-
 baseType :: Parser DefinitionType
 baseType = do
   base <- choice $ map (\s -> try $ symbol s) baseTypes
@@ -144,9 +149,6 @@ typeDef = do
   ident   <- identifier
   return $ TypeDef defType ident
 
-block :: Parser a -> Parser a
-block = between (symbol "{") (symbol "}")
-
 fieldId :: Parser FieldId
 fieldId = do
   fid <- integer
@@ -168,7 +170,8 @@ field = do
   fQualifier <- optional fieldQualifier
   fType <- fieldType
   ident <- identifier
-  return $ Field fId fQualifier fType ident
+  value <- optional $ (void $ symbol "=") >> constValue
+  return $ Field fId fQualifier fType ident value
 
 fields :: Parser [Field]
 fields = many $ spaceConsumer *> field
@@ -255,8 +258,56 @@ serviceDef = do
   funs <- block functions
   return $ ServiceDef ident ext funs
 
+intConstant :: Parser ConstValue
+intConstant = do
+  value <- signedInteger
+  return $ IntConstant value
+
+doubleConstant :: Parser ConstValue
+doubleConstant = do
+  value <- signedDouble
+  return $ DoubleConstant value
+
+listConstant :: Parser ConstValue
+listConstant = do
+  items <- list constValues
+  return $ ListConstant items
+
+constKeyValue :: Parser (ConstValue, ConstValue)
+constKeyValue = do
+  key <- constValue
+  void $ symbol ":"
+  value <- constValue
+  void $ optional $ listSeparatorConsumer
+  return $ (key, value)
+
+mapConstant :: Parser ConstValue
+mapConstant = do
+  kvs <- block $ many $ spaceConsumer *> constKeyValue
+  return $ MapConstant kvs
+
+constValue :: Parser ConstValue
+constValue = try doubleConstant <|> intConstant <|> listConstant <|> mapConstant
+
+constValues :: Parser [ConstValue]
+constValues = many $ spaceConsumer *> separatedConstValue
+  where separatedConstValue = do
+          value <- constValue
+          void $ optional $ listSeparatorConsumer
+          return value
+
+constDef :: Parser Definition
+constDef = do
+  reservedWord "const"
+  ftype <- fieldType
+  ident <- identifier
+  void $ symbol "="
+  cval <- constValue
+  void $ optional $  listSeparatorConsumer
+  return $ ConstDef ftype ident cval
+
 definition :: Parser Definition
-definition = try typeDef <|> try structDef <|> unionDef <|> try enumDef <|> exceptionDef <|> serviceDef
+definition = try typeDef <|> try structDef <|> unionDef <|> try enumDef <|> exceptionDef <|> serviceDef <|> constDef
 
 definitions :: Parser [Definition]
 definitions = many $ spaceConsumer *> definition

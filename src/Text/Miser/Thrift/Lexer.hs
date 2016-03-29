@@ -25,11 +25,29 @@ symbol = L.symbol spaceConsumer
 
 literal :: Parser Literal
 literal = do
-  lit <- char '"' >> manyTill alphaNumChar (char '"')
+  lit <- char '"' >> manyTill asciiChar (char '"')
   return $ Literal lit
 
 integer :: Parser Integer
 integer = lexeme $ L.integer
+
+signedInteger :: Parser Integer
+signedInteger = L.signed spaceConsumer integer
+
+double :: Parser Double
+double = lexeme $ L.float
+
+signedDouble :: Parser Double
+signedDouble = L.signed spaceConsumer double
+
+subType :: Parser a -> Parser a
+subType = between (symbol "<") (symbol ">")
+
+block :: Parser a -> Parser a
+block = between (symbol "{") (symbol "}")
+
+list :: Parser a -> Parser a
+list = between (symbol "[") (symbol "]")
 
 reservedWord :: String -> Parser ()
 reservedWord w = string w *> notFollowedBy alphaNumChar *> spaceConsumer
