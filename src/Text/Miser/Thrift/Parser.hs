@@ -27,6 +27,8 @@ data DefinitionType =
 data ConstValue =
   IntConstant Integer
   | DoubleConstant Double
+  | LiteralConstant Literal
+  | IdentifierConstant Identifier
   | ListConstant [ConstValue]
   | MapConstant [(ConstValue, ConstValue)]
   deriving (Show)
@@ -171,6 +173,7 @@ field = do
   fType <- fieldType
   ident <- identifier
   value <- optional $ (void $ symbol "=") >> constValue
+  void $ optional $ listSeparatorConsumer
   return $ Field fId fQualifier fType ident value
 
 fields :: Parser [Field]
@@ -268,6 +271,16 @@ doubleConstant = do
   value <- signedDouble
   return $ DoubleConstant value
 
+literalConstant :: Parser ConstValue
+literalConstant = do
+  value <- literal
+  return $ LiteralConstant value
+
+identifierConstant :: Parser ConstValue
+identifierConstant = do
+  value <- identifier
+  return $ IdentifierConstant value
+
 listConstant :: Parser ConstValue
 listConstant = do
   items <- list constValues
@@ -287,7 +300,7 @@ mapConstant = do
   return $ MapConstant kvs
 
 constValue :: Parser ConstValue
-constValue = try doubleConstant <|> intConstant <|> listConstant <|> mapConstant
+constValue = try doubleConstant <|> intConstant <|> literalConstant <|> identifierConstant <|> listConstant <|> mapConstant
 
 constValues :: Parser [ConstValue]
 constValues = many $ spaceConsumer *> separatedConstValue

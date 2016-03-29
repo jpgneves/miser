@@ -25,8 +25,10 @@ symbol = L.symbol spaceConsumer
 
 literal :: Parser Literal
 literal = do
-  lit <- char '"' >> manyTill asciiChar (char '"')
+  lit <- (doubleQuote >> manyTill asciiChar doubleQuote) <|> (singleQuote >> manyTill asciiChar singleQuote)
   return $ Literal lit
+    where doubleQuote = char '"'
+          singleQuote = char '\''
 
 integer :: Parser Integer
 integer = lexeme $ L.integer
